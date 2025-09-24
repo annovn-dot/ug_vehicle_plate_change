@@ -87,23 +87,43 @@ local function openDialogAndSubmit()
     end
 
     local vehNet = NetworkGetNetworkIdFromEntity(veh)
-    local ok, msg, finalPlate = lib.callback.await('ug:plate:change', false, vehNet, oldPlate, newPlate)
+    TriggerEvent('ug:plate:attemptChange', vehNet, oldPlate, newPlate)
+end
 
+RegisterNetEvent('ug:plate:attemptChange', function(vehNet, oldPlate, desiredPlate)
+    local ok, msg = lib.callback.await('ug:plate:precheck', false, vehNet, oldPlate, desiredPlate)
     if not ok then
-        lib.notify({ title = 'Plate', description = msg or 'Plate change failed.', type = 'error' })
-        dprint(('Server rejected change: %s'):format(msg or 'unknown error'))
+        lib.notify({ description = msg or 'Cannot change plate.', type = 'error' })
         return
     end
 
-    SetVehicleNumberPlateText(veh, finalPlate)
-    lib.notify({ title = 'Plate', description = ('Plate changed to %s'):format(finalPlate), type = 'success' })
-    dprint(('[OK] Plate changed: %s -> %s'):format(oldPlate, finalPlate))
+    local label = ('Changing plate to %s...'):format((tostring(desiredPlate or '')):upper())
+    local progressOk = lib.progressBar({
+        duration = Config.ProgressDuration or 5000,
+        label = label,
+        useWhileDead = false,
+        canCancel = true,
+        disable = { move = true, car = true, combat = true, mouse = false },
+    })
+
+    if not progressOk then
+        lib.notify({ description = 'Plate change canceled.', type = 'warning' })
+        return
+    end
+
+    local ok2, err, finalPlate = lib.callback.await('ug:plate:change', false, vehNet, oldPlate, desiredPlate)
+    if not ok2 then
+        lib.notify({ description = err or 'Plate change failed.', type = 'error' })
+        return
+    end
+
+    lib.notify({ description = ('Plate changed to %s'):format(finalPlate or desiredPlate), type = 'success' })
 
     Wait(250)
 
     if Config.UGKeysSystem then
         TriggerEvent('keys:received', finalPlate)
     end
-end
+end)
 
 RegisterCommand(Config.Command or 'changeplate', openDialogAndSubmit, false)
