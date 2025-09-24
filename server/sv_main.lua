@@ -85,9 +85,10 @@ local function validateEntityIsPlayersVehicle(src, vehNet)
 end
 
 local function handlePlateChange(source, vehNet, oldPlate, desiredPlate)
-    if not (Bridge and Bridge.hasJobWithGrade) then
+    if not (Bridge and type(Bridge.hasJobWithGrade) == 'function') then
         return false, 'Server bridge not initialized (hasJobWithGrade missing).'
     end
+
     local okJob, jReason = Bridge.hasJobWithGrade(source)
     if not okJob then
         return false, jReason or 'Not allowed.'
@@ -95,25 +96,43 @@ local function handlePlateChange(source, vehNet, oldPlate, desiredPlate)
 
     local oldNorm     = normalizePlate(oldPlate)
     local desiredNorm = normalizePlate(desiredPlate)
+
     if desiredNorm == '' then
         return false, 'Invalid plate.'
     end
+    if desiredNorm == oldNorm then
+        return false, 'New plate must be different from the current plate.'
+    end
 
     local okVeh, vehOrMsg = validateEntityIsPlayersVehicle(source, vehNet)
-    if not okVeh then return false, vehOrMsg end
+    if not okVeh then
+        return false, vehOrMsg
+    end
     local veh = vehOrMsg
 
     if plateExists(desiredNorm) then
         return false, 'That plate is already taken.'
     end
 
+    local charged = false
+    if Config.EnableCharge then
+        local paid = Bridge.chargePlayer(source, tonumber(Config.ChargeAmount) or 0, Config.ChargeWay)
+        if not paid then
+            local where = (Config.ChargeWay == 'cash') and 'cash' or 'bank'
+            return false, ('You don\'t have enough %s to pay %d.'):format(where, Config.ChargeAmount or 0)
+        end
+        charged = true
+    end
+
     local okDB = false
     if Config.OwnershipRequirement then
         local ident = Bridge.getIdentifier(source)
         if not ident then
+            if charged then Bridge.refundPlayer(source, Config.ChargeAmount or 0, Config.ChargeWay) end
             return false, 'Could not resolve your identifier.'
         end
         if not ownsPlate(ident, oldNorm) then
+            if charged then Bridge.refundPlayer(source, Config.ChargeAmount or 0, Config.ChargeWay) end
             return false, 'You do not own this vehicle.'
         end
         okDB = updatePlateOwner(ident, oldNorm, desiredNorm)
@@ -122,10 +141,12 @@ local function handlePlateChange(source, vehNet, oldPlate, desiredPlate)
     end
 
     if not okDB then
+        if charged then Bridge.refundPlayer(source, Config.ChargeAmount or 0, Config.ChargeWay) end
         return false, 'Database update failed.'
     end
 
     SetVehicleNumberPlateText(veh, desiredNorm)
+
     dprint(('[OK] Plate changed%s: %s -> %s'):format(
         Config.OwnershipRequirement and ' (owner-validated)' or ' (job-only)',
         oldNorm, desiredNorm
@@ -133,6 +154,54 @@ local function handlePlateChange(source, vehNet, oldPlate, desiredPlate)
 
     return true, nil, desiredNorm
 end
+
+lib.callback.register('ug:plate:precheck', function(source, vehNet, oldPlate, desiredPlate)
+    if not (Bridge and type(Bridge.hasJobWithGrade) == 'function') then
+        return false, 'Server bridge not initialized.'
+    end
+
+    local okJob, jReason = Bridge.hasJobWithGrade(source)
+    if not okJob then
+        return false, jReason or 'Not allowed.'
+    end
+
+    local oldNorm     = normalizePlate(oldPlate)
+    local desiredNorm = normalizePlate(desiredPlate)
+
+    if desiredNorm == '' then
+        return false, 'Invalid plate.'
+    end
+    if desiredNorm == oldNorm then
+        return false, 'New plate must be different from the current plate.'
+    end
+
+    local okVeh, vehOrMsg = validateEntityIsPlayersVehicle(source, vehNet)
+    if not okVeh then
+        return false, vehOrMsg
+    end
+
+    if plateExists(desiredNorm) then
+        return false, 'That plate is already taken.'
+    end
+
+    if Config.OwnershipRequirement then
+        local ident = Bridge.getIdentifier(source)
+        if not ident then return false, 'Could not resolve your identifier.' end
+        if not ownsPlate(ident, oldNorm) then
+            return false, 'You do not own this vehicle.'
+        end
+    end
+
+    if Config.EnableCharge then
+        local enough = Bridge.hasEnoughMoney(source, tonumber(Config.ChargeAmount) or 0, Config.ChargeWay)
+        if not enough then
+            local where = (Config.ChargeWay == 'cash') and 'cash' or 'bank'
+            return false, ('You don\'t have enough %s to pay %d.'):format(where, Config.ChargeAmount or 0)
+        end
+    end
+
+    return true
+end)
 
 lib.callback.register('ug:plate:change', function(source, vehNet, oldPlate, desiredPlate)
     local ok, r1, r2, r3 = pcall(handlePlateChange, source, vehNet, oldPlate, desiredPlate)
