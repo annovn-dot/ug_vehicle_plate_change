@@ -1,7 +1,5 @@
 Config = {}
 
-Config.Framework = 'esx' -- 'esx', 'qb' or 'qbox'
-
 Config.Debug = false
 
 Config.Zone = {
@@ -14,9 +12,9 @@ Config.Zone = {
 }
 
 Config.JobRequirement = {
-    enabled = true,
+    enabled = false,
     jobs = {
-        mechanic = 0,
+        doj = 0,
     }
 }
 
@@ -27,6 +25,11 @@ Config.Command = 'changeplate'
 -- set to true if you want to trigger keys:received event after plate change
 -- currently set up for our UG Keys system, but may work with others
 Config.UGKeysSystem = false
+
+Config.EnableCharge = true
+Config.ChargeWay = "bank"       -- "bank" or "cash"
+Config.ChargeAmount = 15000
+Config.ProgressDuration = 30000 -- ms
 
 --------------------------------------------------------------------------------------
 --------------------------------- Database settings ----------------------------------
