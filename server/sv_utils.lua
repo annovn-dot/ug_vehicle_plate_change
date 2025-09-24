@@ -163,3 +163,94 @@ function Bridge.hasJobWithGrade(src)
 
     return true
 end
+
+function Bridge.hasEnoughMoney(src, amount, account)
+    if not src or not amount or amount <= 0 then return true end
+    account = (account == 'cash') and 'cash' or 'bank'
+
+    if Bridge.name == 'esx' then
+        local xPlayer = ESX and ESX.GetPlayerFromId(src)
+        if not xPlayer then return false end
+        if account == 'cash' then
+            return (xPlayer.getMoney() or 0) >= amount
+        else
+            local acc = xPlayer.getAccount('bank')
+            return acc and (acc.money or 0) >= amount
+        end
+    elseif Bridge.name == 'qb' or Bridge.name == 'qbox' then
+        local Ply = (QBCore and QBCore.Functions and QBCore.Functions.GetPlayer) and QBCore.Functions.GetPlayer(src)
+        if not Ply then return false end
+        if account == 'cash' then
+            return (Ply.Functions.GetMoney and Ply.Functions.GetMoney('cash') or 0) >= amount
+        else
+            return (Ply.Functions.GetMoney and Ply.Functions.GetMoney('bank') or 0) >= amount
+        end
+    end
+
+    return true
+end
+
+function Bridge.chargePlayer(src, amount, account)
+    if not src or not amount or amount <= 0 then return false end
+    account = (account == 'cash') and 'cash' or 'bank'
+
+    if Bridge.name == 'esx' then
+        local xPlayer = ESX and ESX.GetPlayerFromId(src)
+        if not xPlayer then return false end
+
+        if account == 'cash' then
+            if (xPlayer.getMoney() or 0) >= amount then
+                xPlayer.removeMoney(amount)
+                return true
+            end
+        else
+            local acc = xPlayer.getAccount('bank')
+            if acc and (acc.money or 0) >= amount then
+                xPlayer.removeAccountMoney('bank', amount)
+                return true
+            end
+        end
+        return false
+    elseif Bridge.name == 'qb' or Bridge.name == 'qbox' then
+        local Ply = (QBCore and QBCore.Functions and QBCore.Functions.GetPlayer) and QBCore.Functions.GetPlayer(src)
+        if not Ply then return false end
+
+        if account == 'cash' then
+            if (Ply.Functions.GetMoney and Ply.Functions.GetMoney('cash') or 0) >= amount then
+                Ply.Functions.RemoveMoney('cash', amount, 'plate-change')
+                return true
+            end
+        else
+            if (Ply.Functions.GetMoney and Ply.Functions.GetMoney('bank') or 0) >= amount then
+                Ply.Functions.RemoveMoney('bank', amount, 'plate-change')
+                return true
+            end
+        end
+        return false
+    end
+
+    return true
+end
+
+function Bridge.refundPlayer(src, amount, account)
+    if not src or not amount or amount <= 0 then return end
+    account = (account == 'cash') and 'cash' or 'bank'
+
+    if Bridge.name == 'esx' then
+        local xPlayer = ESX and ESX.GetPlayerFromId(src)
+        if not xPlayer then return end
+        if account == 'cash' then
+            xPlayer.addMoney(amount)
+        else
+            xPlayer.addAccountMoney('bank', amount)
+        end
+    elseif Bridge.name == 'qb' or Bridge.name == 'qbox' then
+        local Ply = (QBCore and QBCore.Functions and QBCore.Functions.GetPlayer) and QBCore.Functions.GetPlayer(src)
+        if not Ply then return end
+        if account == 'cash' then
+            Ply.Functions.AddMoney('cash', amount, 'plate-change-refund')
+        else
+            Ply.Functions.AddMoney('bank', amount, 'plate-change-refund')
+        end
+    end
+end
