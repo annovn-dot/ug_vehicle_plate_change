@@ -90,7 +90,13 @@ local function openDialogAndSubmit()
     TriggerEvent('ug:plate:attemptChange', vehNet, oldPlate, newPlate)
 end
 
-RegisterNetEvent('ug:plate:attemptChange', function(vehNet, oldPlate, desiredPlate)
+local function attemptPlateChange(vehNet, oldPlate, desiredPlate)
+    -- Zone check (1) before anything
+    if Config.Zone and Config.Zone.enabled and not inZone then
+        lib.notify({ title = 'Plate', description = 'You are not in a valid area.', type = 'error' })
+        return
+    end
+
     local ok, msg = lib.callback.await('ug:plate:precheck', false, vehNet, oldPlate, desiredPlate)
     if not ok then
         lib.notify({ description = msg or 'Cannot change plate.', type = 'error' })
@@ -111,6 +117,12 @@ RegisterNetEvent('ug:plate:attemptChange', function(vehNet, oldPlate, desiredPla
         return
     end
 
+    -- Zone check (2) after progress (prevents “start in zone, finish outside”)
+    if Config.Zone and Config.Zone.enabled and not inZone then
+        lib.notify({ title = 'Plate', description = 'You left the valid area.', type = 'error' })
+        return
+    end
+
     local ok2, err, finalPlate = lib.callback.await('ug:plate:change', false, vehNet, oldPlate, desiredPlate)
     if not ok2 then
         lib.notify({ description = err or 'Plate change failed.', type = 'error' })
@@ -124,6 +136,47 @@ RegisterNetEvent('ug:plate:attemptChange', function(vehNet, oldPlate, desiredPla
     if Config.UGKeysSystem then
         TriggerEvent('keys:received', finalPlate)
     end
-end)
+end
+
+local function openDialogAndSubmit()
+    dprint(('Zone.enabled=%s | inZone=%s'):format(
+        tostring(Config.Zone and Config.Zone.enabled),
+        tostring(inZone)
+    ))
+
+    if Config.Zone and Config.Zone.enabled and not inZone then
+        lib.notify({ title = 'Plate', description = 'You are not in a valid area.', type = 'error' })
+        return
+    end
+
+    local veh = getDriverVehicle()
+    if not veh then
+        lib.notify({ title = 'Plate', description = 'You must be driving a vehicle.', type = 'error' })
+        return
+    end
+
+    local rawPlate = GetVehicleNumberPlateText(veh) or ''
+    local oldPlate = sanitizePlate(rawPlate)
+
+    local dialog = lib.inputDialog('Change Plate', {
+        { type = 'input', label = 'New Plate (A–Z / 0–9, no spaces)', placeholder = 'e.g. MYCAR77', required = true, min = 1, max = 8 },
+    })
+    if not dialog then return end
+
+    local newPlate = sanitizePlate(dialog[1])
+    if newPlate == '' then
+        lib.notify({ title = 'Plate', description = 'Invalid plate text.', type = 'error' })
+        return
+    end
+
+    if newPlate == oldPlate then
+        lib.notify({ title = 'Plate', description = 'New plate is the same as the current plate.', type = 'warning' })
+        return
+    end
+
+    local vehNet = NetworkGetNetworkIdFromEntity(veh)
+
+    attemptPlateChange(vehNet, oldPlate, newPlate)
+end
 
 RegisterCommand(Config.Command or 'changeplate', openDialogAndSubmit, false)
