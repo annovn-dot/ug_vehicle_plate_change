@@ -31,6 +31,23 @@ Config.ChargeWay = "bank"       -- "bank" or "cash"
 Config.ChargeAmount = 15000
 Config.ProgressDuration = 30000 -- ms
 
+Config.DiscordLogs = {
+    Enabled = true,
+    Webhook = "",
+    Username = "UG Plate changer",
+    Avatar = "",
+
+    LogDenied = true,          -- logs failures/denies from ug:plate:change
+    LogPrecheckDenied = false, -- optional: logs denials from ug:plate:precheck (can spam)
+
+    Colors = {
+        Success = 3066993,  -- green
+        Denied  = 15158332, -- red
+        Error   = 15105570, -- orange
+        Info    = 3447003,  -- blue
+    }
+}
+
 --------------------------------------------------------------------------------------
 --------------------------------- Database settings ----------------------------------
 --------------------------------------------------------------------------------------
@@ -54,3 +71,4 @@ Config.DB = {
   jsonPlatePath = '$.plate' -- set to your nested plate path if you keep one
 }
 ]]
+
